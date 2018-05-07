@@ -1,0 +1,244 @@
+/*Melissa Fallon
+Monzilla Firefox SQL Queries*/
+
+
+/*USERS DATA*/
+
+/*How many total users are there? 27,267*/
+
+SELECT DISTINCT COUNT(id)
+FROM USERS;
+
+
+/*How many of the total users completed the survey? 4,801*/
+
+SELECT DISTINCT COUNT(user_id)
+FROM SURVEY;
+
+
+/*What is the percentage of users who took the survey 15%*/
+
+SELECT AVG(users_took_survey)*100
+FROM (
+SELECT *,
+CASE
+WHEN a.id = b.user_id THEN 1
+ELSE 0
+END AS users_took_survey
+FROM USERS a 
+LEFT JOIN SURVEY b
+ON a.id = b.user_id)
+AS temp;
+
+
+/*What is the fraction of users new to Firefox? 5.3%*/
+
+SELECT AVG(new_to_fx)*100
+FROM (
+SELECT *,
+CASE
+WHEN CAST(q1 AS int)=0 THEN 1
+ELSE 0
+END AS new_to_fx
+FROM SURVEY)
+AS temp;
+
+
+/* What is the fraction of users that are long term users? 90.7% */
+
+SELECT AVG(old_to_fx)*100
+FROM (
+SELECT *,
+CASE
+WHEN CAST(q1 AS int)>=3 THEN 1
+ELSE 0
+END AS old_to_fx
+FROM SURVEY)
+AS temp;
+
+
+/*What fraction use Firefox as their primary browser? 82.4%*/
+
+SELECT AVG(fx_pri_brows)*100
+FROM (
+SELECT *,
+CASE
+WHEN CAST(q4 AS int)<=1 THEN 1
+ELSE 0
+END AS fx_pri_brows
+FROM SURVEY)
+AS temp;
+
+
+
+/*What fraction use Firefox as their primary browser and are long term users? 76.4%*/
+
+SELECT AVG(long_prim_brows)*100
+FROM (
+SELECT *,
+CASE
+WHEN CAST(q4 AS int)<=1 AND CAST(q1 AS int)>=3 THEN 1
+ELSE 0
+END AS long_prim_brows
+FROM survey)
+AS temp;
+
+
+
+
+
+
+
+/*How many target users do I have? 3,119 total target users*/
+
+SELECT COUNT(target)
+FROM (
+SELECT *,
+CASE
+WHEN CAST(b.q1 AS int)>=3 AND CAST(b.q4 AS int)<=1 THEN 1
+ELSE 0
+END AS target
+FROM USERS a 
+RIGHT JOIN SURVEY b
+ON a.id = b.user_id)
+AS temp
+WHERE target=1;
+
+
+/*my_target user sub-group table*/
+
+SELECT id, q1, q4, q6, target
+INTO temporary my_target
+FROM (
+SELECT *,
+CASE
+WHEN CAST(b.q4 AS int)<=1 AND CAST(b.q1 AS int)>=3 THEN 1
+ELSE 0
+END AS target
+FROM USERS a 
+RIGHT JOIN survey b
+ON a.id = b.user_id) 
+AS temp;
+
+
+
+drop table if exists my_target
+
+
+
+/*BOOKMARK DATA*/
+
+
+/*What's the average number of bookmarks for all users? 106.71 bookmarks*/
+
+SELECT AVG(CAST(REPLACE(data1,'total bookmarks','') AS int))
+FROM EVENTS
+WHERE event_code=8;
+
+
+/*What's the average number of bookmarks for target users? 260.9 bookmarks*/
+
+SELECT(CAST(REPLACE(data1,'total bookmarks','') AS INT))
+FROM my_target a 
+LEFT JOIN events as b
+ON a.id = b.user_id
+WHERE target=1 AND event_code=8;
+
+
+
+/*What fraction of target users launched (i.e., clicked on) at least one bookmark during the sample week?*/
+
+/* 937 / 3119 = 30% */
+
+SELECT DISTINCT COUNT(id)
+FROM my_target a 
+LEFT JOIN EVENTS b
+ON a.id = b.user_id
+WHERE target=1 AND event_code=10;
+
+
+
+/*What's the total number of bookmark actions taken by target users? 9,370*/
+
+/*What's the average number of bookmark interactions per target user? 9,370 / 3119 = 3% bookmark interactions per target user*/
+
+SELECT COUNT(event_code)
+FROM my_target a 
+LEFT JOIN EVENTS b
+ON a.id = b.user_id
+WHERE target=1 and (event_code=9 or event_code=10 or event_code=11);
+
+
+
+/*What's the distribution of how often bookmarks were used by target users during the sample week?*/
+
+/*Results exported to Excel*/
+
+SELECT id, COUNT(event_code)
+FROM my_target a 
+LEFT JOIN EVENTS b
+ON a.id = b.user_id
+WHERE target=1 and (event_code=9 or event_code=10 or event_code=11)
+GROUP BY id;
+
+
+
+/*TABS*/
+
+
+
+/*What's the distribution of maximum number of tabs?*/
+
+/*Results exported to Excel*/
+
+SELECT id, MAX(cast(REPLACE(data2,'tabs','') AS int))
+FROM my_target a 
+LEFT JOIN EVENTS b
+ON a.id = b.user_id
+WHERE target=1 AND event_code=26
+GROUP BY id;
+
+
+/*What’s the average number of tabs open by target users? 8.0*/
+
+SELECT AVG(CAST(REPLACE(data2, 'tabs', '') AS int))
+FROM my_target a 
+LEFT JOIN EVENTS b
+ON a.id = b.user_id
+WHERE target=1 and event_code=26;
+
+
+
+/*Are there target users who regularly have more than 10 tabs open? 180 target users with average tabs >10*/
+
+/* 193 / 3119 = 6.0% of target users*/
+
+SELECT user_id, AVG(CAST(REPLACE(data2,'tabs','') AS int))
+FROM _target a 
+LEFT JOIN EVENTS b
+ON a.id = b.user_id
+WHERE target=1 AND event_code=26
+GROUP BY user_id
+HAVING AVG(CAST(REPLACE(data2,'tabs','') AS int))>10
+ORDER BY 2;
+
+
+
+/*What fraction of target users have ever had more than 5 tabs open? 37.19%*/
+
+/*10 tabs open? 18.35%*/
+
+/*15 tabs open? 10.82%*/
+
+SELECT AVG(tabs_open)*100
+FROM (
+SELECT*,
+CASE
+WHEN CAST(REPLACE(data2,'tabs','') AS int)> THEN 1
+ELSE 0
+END AS tabs_open
+FROM my_target a 
+LEFT JOIN EVENTS b
+ON a.id = b.user_id) AS temp
+WHERE event_code=26 and target=1;
+
